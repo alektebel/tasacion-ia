@@ -1,5 +1,6 @@
 """Almacén de ficheros crudos: guarda en disco y registra procedencia en ingest.raw_file."""
 
+import gzip
 import hashlib
 import json
 import os
@@ -119,3 +120,24 @@ def register(
     if Path(existing[1]).resolve() != path.resolve():
         path.unlink()
     return StoredFile(existing[0], Path(existing[1]), sha256, nuevo=False)
+
+
+def save_bytes(
+    source: str,
+    filename: str,
+    content: bytes,
+    origin_url: str | None = None,
+    content_type: str | None = None,
+    metadata: dict | None = None,
+    compress: bool = False,
+) -> StoredFile:
+    """Guarda contenido ya obtenido (p.ej. una página scrapeada), opcionalmente en gzip."""
+    target_dir = DATA_DIR / source / date.today().isoformat()
+    target_dir.mkdir(parents=True, exist_ok=True)
+    sha = hashlib.sha256(content).hexdigest()
+    if compress:
+        content = gzip.compress(content)
+        filename += ".gz"
+    path = target_dir / filename
+    path.write_bytes(content)
+    return register(source, path, sha, origin_url, content_type, metadata)

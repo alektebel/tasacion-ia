@@ -59,3 +59,41 @@ def descargar_boe(
     from tasacion.fuentes import boe
 
     _print(boe.descargar(date.fromisoformat(desde), date.fromisoformat(hasta) if hasta else None))
+
+
+@descargar.command("boe-subastas")
+def descargar_boe_subastas():
+    """Anuncios XML de subasta (Seguridad Social, AEAT...) citados en los sumarios ya descargados."""
+    from tasacion.fuentes import boe
+
+    _print(boe.descargar_anuncios())
+
+
+scrapear = typer.Typer(help="Scraping de portales (I+D). Una petición por segundo; se para ante 403/429.")
+app.add_typer(scrapear, name="scrapear")
+
+
+@scrapear.command("pisoscom")
+def scrapear_pisoscom(
+    fase: str = typer.Argument(..., help="listados | fichas"),
+    provincia: list[str] = typer.Option(None, help="Slug de pisos.com, p.ej. madrid. Por defecto, todas."),
+    limite: int = typer.Option(None, help="Máximo de fichas (fase fichas)"),
+    pausa: float = 1.0,
+):
+    """pisos.com: fase 'listados' (precio, m², URL) y fase 'fichas' (coordenadas, características)."""
+    from tasacion.fuentes import pisoscom
+
+    if fase == "listados":
+        _print(pisoscom.listados(provincia or None, pausa))
+    elif fase == "fichas":
+        _print(pisoscom.fichas(limite, pausa))
+    else:
+        raise typer.BadParameter("fase debe ser 'listados' o 'fichas'")
+
+
+@scrapear.command("fotocasa")
+def scrapear_fotocasa(max_paginas: int = typer.Option(None), pausa: float = 1.0):
+    """fotocasa.es: listado nacional (incluye coordenadas). Repetir para completar huecos."""
+    from tasacion.fuentes import fotocasa
+
+    _print(fotocasa.listados(pausa, max_paginas))
