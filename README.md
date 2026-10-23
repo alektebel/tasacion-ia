@@ -2,6 +2,15 @@
 
 Sistema para validar tasaciones inmobiliarias (ECO/805, residencial, España): ingiere el PDF de la tasación en un esquema estructurado, la contrasta con fuentes externas y emite un veredicto **validada / con dudas / revisión obligatoria** con sub-scores explicables.
 
+## Arranque rápido
+
+```bash
+docker compose up -d   # PostGIS en localhost:5433 con el esquema aplicado
+uv sync
+```
+
+Todas las vías de instalación (Docker, Postgres nativo, gestionado, pip, GDAL) y la estimación de disco: [`docs/instalacion.md`](docs/instalacion.md).
+
 ## Decisiones tomadas
 
 - **Cliente objetivo**: banco / prestamista hipotecario que recibe tasaciones de terceros.

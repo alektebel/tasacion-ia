@@ -1,0 +1,20 @@
+[project]
+name = "tasacion"
+version = "0.1.0"
+description = "Validación de tasaciones inmobiliarias ECO/805"
+authors = [
+    { name = "diego_atencia", email = "dratencia@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.6",
+    "typer>=0.27.3",
+]
+
+[project.scripts]
+tasacion = "tasacion.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13.0"]
+build-backend = "uv_build"

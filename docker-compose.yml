@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: tasacion
+      POSTGRES_USER: tasacion
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tasacion}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  pgdata:
