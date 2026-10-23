@@ -9,6 +9,8 @@ docker compose up -d   # PostGIS en localhost:5433 con el esquema aplicado
 uv sync
 ```
 
+Vías de obtención de datos y su estado: [`docs/obtencion-datos.md`](docs/obtencion-datos.md). Catálogo de fuentes: [`docs/fuentes.md`](docs/fuentes.md).
+
 Todas las vías de instalación (Docker, Postgres nativo, gestionado, pip, GDAL) y la estimación de disco: [`docs/instalacion.md`](docs/instalacion.md).
 
 ## Decisiones tomadas
