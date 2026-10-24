@@ -307,7 +307,7 @@ Son datos agregados del sector, **sin desglose por sociedad**. El CSV equivalent
   - Detalle: `https://subastas.boe.es/detalleSubasta.php?idSub=SUB-JA-2026-265519&ver={1..5}`. Las pestañas son información general, autoridad gestora, bienes/lotes, relacionados y pujas (orden NO VERIFICADO). Los campos incluyen **Tasación**, Valor subasta, Cantidad reclamada, Puja mínima, Lotes y Anuncio BOE.
   - Enlace corto: `https://subastas.boe.es/ds.php?id={idSub}`.
 - **Vía permitida: la API de datos abiertos del BOE**, cuya reutilización está autorizada por su aviso legal:
-  - Sumario diario: `https://www.boe.es/datosabiertos/api/boe/sumario/{AAAAMMDD}` con `Accept: application/json` (✅ 200, ~400 KB). Los anuncios de subasta están en la sección **V-B** (Otros anuncios oficiales).
+  - Sumario diario: `https://www.boe.es/datosabiertos/api/boe/sumario/{AAAAMMDD}` con `Accept: application/json` (✅ 200, ~400 KB). Las **subastas judiciales** van en la sección **IV** (solo con el id `SUB-JA-…`; el valor está en subastas.boe.es). Las **administrativas** (Seguridad Social, Hacienda, Defensa, puertos) van en la **V-B**, con el texto completo (ref. catastral, m²). *Corregido el 2026-10-24.*
   - Anuncio individual: `https://www.boe.es/diario_boe/xml.php?id=BOE-B-AAAA-NNNNN` (✅ 200). El texto contiene el `idSub` y el enlace `https://subastas.boe.es/ds.php?id=SUB-...`.
 - **Uso:** como señal o testigo (precio de salida y tasación a efectos de subasta frente a la tasación hipotecaria), no como comparable de mercado. **Prioridad: P1** vía API del BOE. Consultar el detalle de subastas.boe.es solo de forma puntual y manual, o pedir autorización a la AEBOE.
 

@@ -32,7 +32,21 @@ Hay siete vías de obtención:
 | Certificados energéticos: Madrid, C. Valenciana, Canarias, Cataluña | CSV/ZIP | `tasacion descargar certificados` | Mensual o semestral | ✅ 1,1 GB |
 | Certificados energéticos: Aragón | CSV | ídem | — | ❌ SSL roto en el servidor de origen |
 | Sumarios del BOE (subastas en la sección V-B) | JSON | `tasacion descargar boe` | Diario | ⏳ En curso desde 2015 |
-| Anuncios individuales de subasta del BOE | XML (`/diario_boe/xml.php?id=BOE-B-...`) | — | Diario | 🔲 Pendiente: filtrar los sumarios y bajar cada anuncio |
+| Anuncios de subasta administrativa del BOE (sección V-B: Seguridad Social, Hacienda, Defensa) | XML (`/diario_boe/xml.php?id=BOE-B-...`), con ref. catastral y m² | `tasacion descargar boe-subastas` | Diario | ⏳ En curso (unos 15.000) |
+| Subastas judiciales del BOE (sección IV) | El BOE solo publica el id `SUB-JA-…`; el valor está en subastas.boe.es (bloqueado por robots.txt) | — | — | ⛔ Solo el identificador |
+| INE, renta por sección censal (ADRH, 2015–2024) | CSV | `tasacion descargar abiertos --fuente ine_adrh` | Anual | ⏳ 54 tablas |
+| INE, cartografía de secciones censales 2026 | SHP en ZIP | `--fuente ine_seccionado` | Anual | ⏳ |
+| INE, Censo 2021 (indicadores por sección, año de construcción por municipio, microdatos de viviendas) | CSV, XLSX, ZIP | `--fuente ine_censo2021` | — | ⏳ |
+| SERPAVI: índice de alquiler por sección censal (2011–2024) | XLSX | `--fuente serpavi` | Anual | ⏳ |
+| OpenStreetMap España (Geofabrik) | PBF, 1,5 GB, ODbL | `--fuente osm` | Diario | ⏳ |
+| GTFS: unos 120 operadores (Mobility Database), EMT, CRTM, Cercanías | ZIP | `--fuente gtfs` | Variable | ⏳ |
+| Hacienda: IRPF por municipio (2016–2023) | XLSX (sin código INE: el cruce es por nombre) | `--fuente hacienda_irpf` | Anual | ⏳ |
+| Registradores: compraventas comerciales por provincia | CSV | `--fuente registradores` | Trimestral | ⏳ |
+| ITE de Euskadi (un registro por edificio: año, rehabilitación, estado de la inspección) | JSON | `--fuente ite_euskadi` | — | ⏳ |
+| IEE de la C. Valenciana (informes con ref. catastral y letra energética; edificios de más de 50 años) | CSV vía WFS | `--fuente iee_valencia` | — | ⏳ |
+| Certificados energéticos de Euskadi y Castilla y León | CSV | `--fuente cee_euskadi cee_castilla_leon` | — | ⏳ |
+| Madrid: indicadores por distrito y barrio, edificios en ruina | CSV, XLSX | `--fuente madrid_opendata` | Anual | ⏳ |
+| Barcelona: valores catastrales por sección, compraventas notariales por barrio | CSV | `--fuente barcelona_opendata` | Mensual o anual | ⏳ |
 | Ayuntamiento de Madrid: licencias urbanísticas | CSV | — | — | 🔲 Pendiente (P2) |
 | BdE: estadísticas agregadas de tasación | PDF | — | Trimestral | 🔲 Pendiente (P2, sin desglose por sociedad) |
 | Registradores: Estadística Registral Inmobiliaria | PDF | — | Trimestral | 🔲 Pendiente (P2, solo PDF) |
@@ -86,13 +100,33 @@ Cada tasación que ingerimos alimenta bases propias que ningún proveedor tiene:
 
 ## 7. Scraping
 
-**No se ha scrapeado ningún portal ni web privada.** Todo lo descargado viene de descargas o APIs abiertas oficiales.
+El equipo decidió (2026-10-24) scrapear portales **solo para I+D**. En producción hay que sustituirlo por datos licenciados, porque el banco preguntará por la procedencia.
 
-| Web | Situación | Estado |
+Reglas de los scrapers:
+- Respetan `robots.txt`.
+- Hacen una petición por segundo, sin paralelismo.
+- Se paran ante un 403 o 429.
+- **No intentan evadir ninguna protección anti-bot** (ni proxies, ni resolución de CAPTCHA, ni navegadores camuflados).
+- Guardan el HTML en gzip en `data/raw/` para poder volver a procesarlo.
+
+| Web | Qué se obtiene | Comando | Estado |
+|---|---|---|---|
+| fotocasa.es | Listado nacional, unos 484.000 anuncios. El JSON incluye coordenadas, dirección, CP, precio y características: no hace falta visitar las fichas. | `tasacion scrapear fotocasa` | ⏳ En curso. El orden de las páginas no es estable: repetir la ejecución completa los huecos. |
+| pisos.com | Fase 1: listados (precio, m², habitaciones, URL), bajando por subzonas por el límite de 100 páginas. Fase 2: fichas (coordenadas, superficie útil, planta, antigüedad, conservación). | `tasacion scrapear pisoscom listados` y después `fichas` | ⏳ En curso; las fichas tardarán días |
+| Idealista | Responde 403 (protección anti-bot) | — | ⛔ Solo vía API oficial (pedir acceso en developers.idealista.com) |
+| Habitaclia | Carga los anuncios por JavaScript; es del mismo grupo que Fotocasa | — | ⏸️ No se ha hecho: aportaría poco |
+| Portal Estadístico Notarial | Sus condiciones prohíben el uso comercial y cargar los datos en una base de datos | — | ⛔ Excluido |
+| subastas.boe.es | `robots.txt` con `Disallow: /` | — | ⛔ Se usa la API de datos abiertos del BOE |
+| Subastas de la AEAT (`bienes.js`: 176 inmuebles con valoración, ref. catastral y GPS; licencia CC BY 4.0) | `robots.txt` con `Disallow: /` | — | ⛔ Pendiente de pedir permiso a la AEAT o confirmar que se puede usar |
+
+## 8. No descargables automáticamente
+
+| Fuente | Motivo | Alternativa |
 |---|---|---|
-| Idealista | Sus condiciones prohíben el scraping expresamente | ⛔ Bloqueado, pendiente de decisión |
-| Fotocasa, Habitaclia, pisos.com | Protegen sus contenidos y su base de datos (derecho *sui generis*, art. 133 LPI) | ⛔ Bloqueado, pendiente de decisión |
-| Portal Estadístico Notarial | Sus condiciones prohíben el uso comercial y cargar los datos en una base de datos | ⛔ Excluido, pendiente de confirmación |
-| subastas.boe.es | `robots.txt` con `Disallow: /` | ⛔ Se usa la API de datos abiertos del BOE en su lugar |
-
-Si se decide scrapear portales para I+D, el diseño ya lo soporta (`fuente.anuncio` y `fuente.anuncio_observacion`). La decisión tiene que tomarla el equipo, idealmente con asesoría legal, porque el banco cliente preguntará por la procedencia de los datos.
+| CNIG (CartoCiudad masivo, SIOSE, CORINE) | Las descargas exigen reCAPTCHA | Descarga manual por provincia, o WMS de ocupación del suelo en IDEE por punto |
+| NAP de transporte (todos los GTFS oficiales) | Necesita API key (registro gratuito) | Registrarse y añadir la key. Mientras tanto se usa Mobility Database. |
+| Ministerio del Interior: criminalidad por municipio | Protección de Cloudflare (403) | Descarga manual desde el navegador |
+| Mapas de ruido (SICA, fase 3) | El servidor tiene la cadena TLS incompleta. Además, la fase 4 no está publicada. | Descarga manual, o WMS de ruido por punto |
+| Certificados energéticos de Aragón | Certificado SSL roto en el servidor | Descarga manual |
+| Certificados de Galicia y Castilla-La Mancha | El enlace devuelve HTML o no conecta | — |
+| Certificados de Asturias, Extremadura y Cantabria | Existen (XLSX, XLS, 7z), pero falta la URL directa verificada | Pendiente |

@@ -61,6 +61,16 @@ def descargar_boe(
     _print(boe.descargar(date.fromisoformat(desde), date.fromisoformat(hasta) if hasta else None))
 
 
+@descargar.command("abiertos")
+def descargar_abiertos(
+    fuente: list[str] = typer.Option(None, help="Sólo estas fuentes (p.ej. osm, ine_adrh, gtfs). Por defecto, todas."),
+):
+    """Contexto abierto: renta INE, censo, SERPAVI, OSM, GTFS, ITE/IEE, más CEE, open data municipal."""
+    from tasacion.fuentes import abiertos
+
+    _print(abiertos.descargar(fuente or None))
+
+
 @descargar.command("boe-subastas")
 def descargar_boe_subastas():
     """Anuncios XML de subasta (Seguridad Social, AEAT...) citados en los sumarios ya descargados."""
