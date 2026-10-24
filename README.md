@@ -13,6 +13,15 @@ Vías de obtención de datos y su estado: [`docs/obtencion-datos.md`](docs/obten
 
 Todas las vías de instalación (Docker, Postgres nativo, gestionado, pip, GDAL) y la estimación de disco: [`docs/instalacion.md`](docs/instalacion.md).
 
+## Ingesta de tasaciones
+
+```bash
+uv run tasacion ingerir informe.pdf --operacion REF-BANCO-123   # extrae con Claude y carga en tasacion.*
+uv run tasacion ingerir informe.pdf --solo-json                 # sólo ver la extracción
+```
+
+Requiere credenciales de la API de Anthropic (`ANTHROPIC_API_KEY` o `ant auth login`). El esquema de extracción está en `src/tasacion/ingesta/esquema.py`.
+
 ## Decisiones tomadas
 
 - **Cliente objetivo**: banco / prestamista hipotecario que recibe tasaciones de terceros.

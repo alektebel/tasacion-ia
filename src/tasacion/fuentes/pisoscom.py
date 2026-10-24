@@ -41,6 +41,9 @@ PROVINCIAS = [
 ]
 
 
+MAX_REINTENTOS = 17
+
+
 class Bloqueado(Exception):
     pass
 
@@ -58,14 +61,17 @@ class Cliente:
         espera = self.pausa - (time.monotonic() - self._ultima)
         if espera > 0:
             time.sleep(espera)
-        for intento in range(3):
+        # Ante caídas de red (DNS, conexión) esperamos con backoff hasta ~2 h antes de rendirnos.
+        for intento in range(MAX_REINTENTOS):
             try:
                 resp = self.http.get(self.base + path)
                 break
-            except httpx.TransportError:
-                if intento == 2:
+            except httpx.TransportError as exc:
+                if intento == MAX_REINTENTOS - 1:
                     raise
-                time.sleep(10 * (intento + 1))
+                espera = min(600, 10 * 2**intento)
+                log.warning("red: %s; reintento en %ds", exc, espera)
+                time.sleep(espera)
         self._ultima = time.monotonic()
         if resp.status_code in (403, 429):
             raise Bloqueado(f"{resp.status_code} en {path}")

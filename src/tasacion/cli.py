@@ -107,3 +107,28 @@ def scrapear_fotocasa(max_paginas: int = typer.Option(None), pausa: float = 1.0)
     from tasacion.fuentes import fotocasa
 
     _print(fotocasa.listados(pausa, max_paginas))
+
+
+@app.command("ingerir")
+def ingerir(
+    pdf: list[str] = typer.Argument(..., help="Uno o varios PDFs de tasación"),
+    operacion: str = typer.Option(None, help="Referencia de la operación en el banco"),
+    solo_json: bool = typer.Option(False, help="Extraer e imprimir el JSON sin cargar en la base de datos"),
+):
+    """Extrae cada PDF con Claude al esquema ECO y lo carga en tasacion.*."""
+    import hashlib
+    from pathlib import Path
+
+    from tasacion.ingesta import carga, extractor
+
+    for ruta in pdf:
+        path = Path(ruta)
+        extraida, meta = extractor.extraer(path)
+        meta["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+        if solo_json:
+            typer.echo(extraida.model_dump_json(indent=2))
+            continue
+        tasacion_id = carga.cargar(path, extraida, meta, operacion)
+        typer.echo(f"{path.name}: tasación {tasacion_id} ({len(extraida.fincas)} fincas, "
+                   f"{sum(len(f.testigos) for f in extraida.fincas)} testigos, "
+                   f"{len(extraida.avisos_extraccion)} avisos)")

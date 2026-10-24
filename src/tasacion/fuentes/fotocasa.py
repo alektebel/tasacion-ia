@@ -22,14 +22,23 @@ BASE = "https://www.fotocasa.es"
 PORTAL = "fotocasa"
 LISTADO = "/es/comprar/viviendas/espana/todas-las-zonas/l"
 POR_PAGINA = 30
+# El buscador deja de paginar (repite resultados) a partir de ~10.000.
+MAX_RESULTADOS = 9900
 
 
-def parse_listado(pagina: str) -> tuple[int | None, list[dict]]:
+def parse_listado(pagina: str) -> tuple[int | None, list[str], list[dict]]:
+    """Devuelve (total, subzonas, anuncios). Las subzonas son las del primer nivel
+    geográfico inferior con elementos (provincia -> comarca -> municipio -> distrito...)."""
     m = re.search(r'id="__initial_props__"[^>]*>(.*?)</script>', pagina, re.S)
     if not m:
-        return None, []
+        return None, [], []
     result = json.loads(m.group(1)).get("initialSearch", {}).get("result", {})
-    return result.get("count"), result.get("realEstates", [])
+    subzonas = []
+    for nivel in result.get("geographicSearch", []):
+        if nivel.get("items"):
+            subzonas = [i["url"] for i in nivel["items"] if i.get("url") and i.get("counter")]
+            break
+    return result.get("count"), subzonas, result.get("realEstates", [])
 
 
 def _feature(anuncio: dict, key: str):
@@ -88,35 +97,44 @@ def _guardar(conn: psycopg.Connection, anuncios: list[dict], raw_file_id: int) -
 
 
 def listados(pausa: float = 1.0, max_paginas: int | None = None) -> dict:
-    """Recorre el listado nacional. El orden no es estable entre páginas: cada ejecución
-    recupera la mayoría de anuncios y las siguientes completan los huecos."""
+    """Recorre el listado bajando por zonas: el buscador sólo sirve ~10.000 resultados
+    por consulta, así que las zonas más grandes se parten en sus subzonas."""
     cli = Cliente(pausa, base=BASE)
-    stats = {"paginas": 0, "anuncios": 0, "nuevos": 0}
+    stats = {"zonas": 0, "paginas": 0, "anuncios": 0, "nuevos": 0}
+    visitadas: set[str] = set()
+    pendientes = [LISTADO]
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        total, _ = parse_listado(cli.get(LISTADO).text)
-        n_paginas = math.ceil((total or 0) / POR_PAGINA)
-        if max_paginas:
-            n_paginas = min(n_paginas, max_paginas)
-        log.info("fotocasa: %s anuncios, %d páginas", total, n_paginas)
-        vacias = 0
-        for n in range(1, n_paginas + 1):
-            path = LISTADO if n == 1 else f"{LISTADO}/{n}"
-            resp = cli.get(path)
-            _, anuncios = parse_listado(resp.text)
-            if not anuncios:
-                vacias += 1
-                if vacias >= 5:
-                    log.warning("5 páginas vacías seguidas en %d; paro", n)
-                    break
+        while pendientes:
+            zona = pendientes.pop(0)
+            if zona in visitadas:
                 continue
-            vacias = 0
-            f = save_bytes(
-                "fotocasa_listado", f"espana_{n}.html", resp.content, str(resp.url), "text/html",
-                {"pagina": n}, compress=True,
-            )
-            stats["nuevos"] += _guardar(conn, anuncios, f.raw_file_id)
-            stats["paginas"] += 1
-            stats["anuncios"] += len(anuncios)
-            if n % 200 == 0:
-                log.info("fotocasa: %d/%d páginas, %d nuevos", n, n_paginas, stats["nuevos"])
+            visitadas.add(zona)
+            resp = cli.get(zona)
+            total, subzonas, anuncios = parse_listado(resp.text)
+            stats["zonas"] += 1
+            subzonas = [z for z in subzonas if z not in visitadas]
+            if total and total > MAX_RESULTADOS and subzonas:
+                log.info("%s: %d resultados, bajo a %d subzonas", zona, total, len(subzonas))
+                pendientes += subzonas
+                continue
+            n_paginas = math.ceil(min(total or 0, MAX_RESULTADOS) / POR_PAGINA) or 1
+            if max_paginas:
+                n_paginas = min(n_paginas, max_paginas)
+            log.info("%s: %s resultados, %d páginas", zona, total, n_paginas)
+            for n in range(1, n_paginas + 1):
+                if n > 1:
+                    resp = cli.get(f"{zona}/{n}")
+                    _, _, anuncios = parse_listado(resp.text)
+                if not anuncios:
+                    break
+                nombre = zona.removeprefix("/es/comprar/viviendas/").removesuffix("/l").replace("/", "_")
+                f = save_bytes(
+                    "fotocasa_listado", f"{nombre}_{n}.html", resp.content, str(resp.url), "text/html",
+                    {"zona": zona, "pagina": n}, compress=True,
+                )
+                stats["nuevos"] += _guardar(conn, anuncios, f.raw_file_id)
+                stats["paginas"] += 1
+                stats["anuncios"] += len(anuncios)
+            if stats["zonas"] % 50 == 0:
+                log.info("fotocasa: %d zonas, %d páginas, %d nuevos", stats["zonas"], stats["paginas"], stats["nuevos"])
     return stats
