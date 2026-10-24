@@ -132,3 +132,21 @@ def ingerir(
         typer.echo(f"{path.name}: tasación {tasacion_id} ({len(extraida.fincas)} fincas, "
                    f"{sum(len(f.testigos) for f in extraida.fincas)} testigos, "
                    f"{len(extraida.avisos_extraccion)} avisos)")
+
+
+@app.command("avm")
+def avm(lat: float, lon: float, sup: float = typer.Argument(..., help="Superficie construida, m²")):
+    """Valor estimado por comparables para un punto y una superficie (sin guardar)."""
+    from dataclasses import asdict
+
+    from tasacion.scoring import avm as m
+
+    est = m.estimar(lat, lon, sup)
+    if est is None:
+        typer.echo("Sin comparables suficientes")
+        raise typer.Exit(1)
+    resumen = {k: v for k, v in asdict(est).items() if k != "comparables"}
+    resumen["top_comparables"] = [
+        {k: round(v, 1) if isinstance(v, float) else v for k, v in c.items()} for c in est.comparables[:5]
+    ]
+    _print(resumen)
