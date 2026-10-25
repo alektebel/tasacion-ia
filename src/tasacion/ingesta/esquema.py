@@ -100,6 +100,20 @@ class Evidencia(BaseModel):
     confianza: Confianza
 
 
+class Aviso(BaseModel):
+    tipo: Literal["contradiccion", "laguna", "nota_lectura"] = Field(
+        description="contradiccion: el informe se contradice a sí mismo o con sus anexos (nota simple, "
+        "catastro...); laguna: falta algo que la ECO/805 exige o que el valor necesita; "
+        "nota_lectura: decisión o duda del extractor al leer (ilegible, campo ambiguo...)"
+    )
+    gravedad: Literal["alta", "media", "baja"] = Field(
+        description="alta si puede cambiar el valor o la validez de la tasación (cargas omitidas, "
+        "superficies incompatibles, testigos dudosos); baja si es formal"
+    )
+    texto: str
+    paginas: list[int]
+
+
 class TasacionExtraida(BaseModel):
     sociedad_nombre: str | None
     sociedad_codigo_bde: str | None = Field(description="Nº de inscripción en el registro del Banco de España")
@@ -128,6 +142,4 @@ class TasacionExtraida(BaseModel):
     evidencias: list[Evidencia] = Field(
         description="Una por cada valor, superficie, ref. catastral, fecha y testigo extraído"
     )
-    avisos_extraccion: list[str] = Field(
-        description="Problemas: páginas ilegibles, datos contradictorios dentro del informe, tablas cortadas..."
-    )
+    avisos_extraccion: list[Aviso]

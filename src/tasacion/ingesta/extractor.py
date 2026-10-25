@@ -1,21 +1,29 @@
 """Extracción de un PDF de tasación al esquema TasacionExtraida con Claude.
 
 El PDF se envía entero como bloque `document` (PDFs nativos y escaneados: Claude lee el texto
-y las imágenes de cada página). La salida va restringida al esquema con structured outputs.
+y las imágenes de cada página).
+
+No se usa structured outputs estricto: la API limita a 16 los campos con unión (nullable) y el
+esquema de una tasación tiene más de cien. El esquema JSON va en el prompt, la respuesta se
+valida con Pydantic y, si no valida, se reintenta una vez devolviendo el error al modelo.
 """
 
 import base64
+import json
 import logging
+import re
 from pathlib import Path
 
 import anthropic
+from pydantic import ValidationError
 
 from tasacion.ingesta.esquema import TasacionExtraida
 
 log = logging.getLogger(__name__)
 
 MODELO = "claude-opus-5-5"
-VERSION = "extractor-v1"
+VERSION = "extractor-v3"
+MAX_INTENTOS = 2
 
 SISTEMA = """\
 Extraes datos de informes de tasación inmobiliaria españoles (Orden ECO/805/2003, reformada \
@@ -31,45 +39,71 @@ coeficientes de homogeneización si existe.
 - En `evidencias`, cita el fragmento literal y la página de cada valor, superficie, \
 referencia catastral, fecha y testigo. Marca la confianza como baja si el texto es dudoso \
 o la página es difícil de leer.
-- En `avisos_extraccion`, anota contradicciones internas del propio informe (p.ej. dos \
-superficies distintas para la misma finca) y cualquier parte que no hayas podido leer.
+- En `avisos_extraccion`, anota cada problema clasificado: contradicciones del informe consigo \
+mismo o con sus anexos (nota simple, ficha catastral), lagunas frente a lo que exige la ECO/805 \
+y, aparte, tus propias notas de lectura. Sé concreto: cifras, páginas, qué dice cada parte.
 - No extraigas datos personales del solicitante ni de los titulares (nombres, NIF, contacto).
-"""
+
+Responde sólo con un objeto JSON que valide contra este esquema (todas las claves presentes, \
+null cuando no haya dato), sin texto adicional:
+
+""" + json.dumps(TasacionExtraida.model_json_schema(), ensure_ascii=False)
+
+
+def _json(texto: str) -> str:
+    """Quita un posible bloque ```json ... ``` alrededor de la respuesta."""
+    m = re.search(r"```(?:json)?\s*(.*?)```", texto, re.S)
+    return m.group(1) if m else texto
 
 
 def extraer(pdf: Path, client: anthropic.Anthropic | None = None) -> tuple[TasacionExtraida, dict]:
     """Devuelve la extracción validada y metadatos de la llamada (modelo, uso, request id)."""
     client = client or anthropic.Anthropic()
     datos = base64.standard_b64encode(pdf.read_bytes()).decode()
-    response = client.beta.messages.parse(
-        model=MODELO,
-        max_tokens=32000,
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-        thinking={"type": "adaptive"},
-        output_config={"effort": "high"},
-        system=SISTEMA,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "document",
-                    "source": {"type": "base64", "media_type": "application/pdf", "data": datos},
-                },
-                {"type": "text", "text": "Extrae este informe de tasación."},
-            ],
-        }],
-        output_format=TasacionExtraida,
-    )
-    if response.stop_reason == "refusal":
-        raise RuntimeError(f"El modelo rechazó la extracción: {response.stop_details}")
-    if response.stop_reason == "max_tokens":
-        raise RuntimeError("Extracción truncada por max_tokens")
+    mensajes = [{
+        "role": "user",
+        "content": [
+            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": datos}},
+            {"type": "text", "text": "Extrae este informe de tasación."},
+        ],
+    }]
+    uso = {"input_tokens": 0, "output_tokens": 0}
+    for intento in range(1, MAX_INTENTOS + 1):
+        # Streaming: con max_tokens alto el SDK lo exige para evitar timeouts HTTP.
+        with client.beta.messages.stream(
+            model=MODELO,
+            max_tokens=64000,
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
+            system=SISTEMA,
+            messages=mensajes,
+        ) as stream:
+            response = stream.get_final_message()
+        uso["input_tokens"] += response.usage.input_tokens
+        uso["output_tokens"] += response.usage.output_tokens
+        if response.stop_reason == "refusal":
+            raise RuntimeError(f"El modelo rechazó la extracción: {response.stop_details}")
+        if response.stop_reason == "max_tokens":
+            raise RuntimeError("Extracción truncada por max_tokens")
+        texto = "".join(b.text for b in response.content if b.type == "text")
+        try:
+            extraida = TasacionExtraida.model_validate_json(_json(texto))
+            break
+        except ValidationError as exc:
+            log.warning("intento %d: la respuesta no valida (%d errores)", intento, exc.error_count())
+            if intento == MAX_INTENTOS:
+                raise
+            mensajes += [
+                {"role": "assistant", "content": response.content},
+                {"role": "user", "content": f"El JSON no valida contra el esquema. Corrígelo y devuelve el objeto completo:\n{exc}"},
+            ]
     meta = {
         "modelo": response.model,
         "version": VERSION,
-        "request_id": response._request_id,
-        "input_tokens": response.usage.input_tokens,
-        "output_tokens": response.usage.output_tokens,
+        "message_id": response.id,
+        "intentos": intento,
+        **uso,
     }
-    return response.parsed_output, meta
+    return extraida, meta

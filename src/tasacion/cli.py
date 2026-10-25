@@ -150,3 +150,19 @@ def avm(lat: float, lon: float, sup: float = typer.Argument(..., help="Superfici
         {k: round(v, 1) if isinstance(v, float) else v for k, v in c.items()} for c in est.comparables[:5]
     ]
     _print(resumen)
+
+
+@app.command("puntuar")
+def puntuar(tasacion_id: list[int] = typer.Argument(None, help="Ids de tasación; por defecto, todas las no puntuadas")):
+    """Aplica las reglas, calcula sub-scores y semáforo, y lo guarda en scoring.*."""
+    import psycopg
+
+    from tasacion.scoring import reglas
+    from tasacion.store import DATABASE_URL
+
+    if not tasacion_id:
+        with psycopg.connect(DATABASE_URL) as conn:
+            tasacion_id = [r[0] for r in conn.execute(
+                "SELECT id FROM tasacion.tasacion WHERE estado <> 'puntuada' ORDER BY id")]
+    for tid in tasacion_id:
+        _print(reglas.puntuar(tid))

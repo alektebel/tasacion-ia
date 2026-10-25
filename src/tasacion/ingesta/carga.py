@@ -160,7 +160,7 @@ def cargar(pdf: Path, t: TasacionExtraida, meta: dict, operacion_ref: str | None
                  {"alta": 0.9, "media": 0.6, "baja": 0.3}[e.confianza]),
             )
         # Si hay evidencias de baja confianza o avisos, la extracción pasa por revisión humana.
-        if t.avisos_extraccion or any(e.confianza == "baja" for e in t.evidencias):
+        if any(a.tipo != "nota_lectura" for a in t.avisos_extraccion) or any(e.confianza == "baja" for e in t.evidencias):
             conn.execute(
                 "UPDATE tasacion.tasacion SET estado = 'en_revision_extraccion' WHERE id = %s", (tasacion_id,)
             )
