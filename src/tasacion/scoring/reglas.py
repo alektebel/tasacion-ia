@@ -106,7 +106,7 @@ def r_catastro(finca: dict) -> list[Chequeo]:
 # reglas sobre testigos y homogeneización
 # ---------------------------------------------------------------------------
 
-def r_testigos(finca: dict, testigos: list[dict], metodo: str | None) -> list[Chequeo]:
+def r_testigos(finca: dict, testigos: list[dict], metodo: str | None, emision: date | None = None) -> list[Chequeo]:
     out = []
     if metodo not in (None, "comparacion"):
         return out
@@ -127,6 +127,14 @@ def r_testigos(finca: dict, testigos: list[dict], metodo: str | None) -> list[Ch
         out.append(Chequeo("TESTIGOS_IDENTICOS", "fraude", "fallo" if len(duplicados) > 1 else "aviso",
                            f"Testigos con precio y superficie idénticos: {duplicados}",
                            min(1.0, 0.4 * len(duplicados)), observado=duplicados))
+
+    # Un testigo fechado después de emitir el informe no pudo usarse para valorar.
+    if emision:
+        posteriores = [t["orden"] for t in testigos if t["fecha_dato"] and t["fecha_dato"] > emision]
+        if posteriores:
+            out.append(Chequeo("TESTIGOS_POSTERIORES", "fraude", "fallo",
+                               f"Testigos fechados después de la emisión del informe ({emision}): {posteriores}",
+                               min(1.0, 0.3 * len(posteriores)), bloqueante=True, observado=posteriores))
 
     sin_fuente = [t["orden"] for t in testigos if not (t["url"] or t["fuente"])]
     out.append(Chequeo("TESTIGOS_TRAZABLES", "calidad", "aviso" if sin_fuente else "ok",
@@ -255,7 +263,7 @@ def puntuar(tasacion_id: int) -> dict:
                     conn.execute(
                         "UPDATE tasacion.finca SET geom = ST_SetSRID(ST_MakePoint(%s, %s), 4326), "
                         "geocodificacion_fuente = 'catastro' WHERE id = %s", (coords[1], coords[0], finca["id"]))
-        chequeos += r_catastro(finca) + r_testigos(finca, testigos, t["metodo_principal"]) + r_avm(finca, t["fecha_emision"])
+        chequeos += r_catastro(finca) + r_testigos(finca, testigos, t["metodo_principal"], t["fecha_emision"]) + r_avm(finca, t["fecha_emision"])
 
     sub = {}
     for cat in ("valor", "calidad", "fraude"):
