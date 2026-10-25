@@ -26,6 +26,8 @@ Requiere credenciales de la API de Anthropic (`ANTHROPIC_API_KEY` o `ant auth lo
 
 Los testigos se geolocalizan en cascada: referencia catastral → callejero del Catastro cargado en local → CartoCiudad. Antes, un modelo ligero (`qwen3.6` en NAN, `NAN_API_KEY`) normaliza la dirección del informe. Sin esa clave, la regla de distancia queda como no evaluable.
 
+Con la parcela de cada testigo, `puntuar` contrasta el testigo con los inmuebles de esa parcela en Catastro: una sola consulta por parcela, guardada en `fuente.catastro_parcela_inmuebles`. Comprueba que haya un inmueble de ese uso en esa planta, con superficie (±25 %) y año (±5) parecidos.
+
 ## Decisiones tomadas
 
 - **Cliente objetivo**: banco / prestamista hipotecario que recibe tasaciones de terceros.

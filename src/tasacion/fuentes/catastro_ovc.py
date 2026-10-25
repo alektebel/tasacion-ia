@@ -107,3 +107,44 @@ def coordenadas(rc14: str) -> tuple[float, float] | None:
         return None
     geo = coord.get("geo", {})
     return float(geo["ycen"]), float(geo["xcen"])
+
+
+def _unidad(rc: dict, dt: dict, debi: dict) -> dict:
+    loint = dt.get("locs", {}).get("lous", {}).get("lourb", {}).get("loint", {})
+    return {
+        "rc20": "".join(rc.get(k, "") for k in ("pc1", "pc2", "car", "cc1", "cc2")),
+        "uso": debi.get("luso"),
+        "sup": _num(debi.get("sfc")),
+        "anio": int(debi["ant"]) if str(debi.get("ant", "")).isdigit() else None,
+        "escalera": loint.get("es"),
+        "planta": loint.get("pt"),
+        "puerta": loint.get("pu"),
+    }
+
+
+def inmuebles_parcela(rc14: str) -> list[dict]:
+    """Uso, superficie (con comunes), planta y año de cada inmueble de una parcela, en una llamada."""
+    rc14 = rc14[:14].upper()
+    with psycopg.connect(DATABASE_URL) as conn:
+        fila = conn.execute(
+            "SELECT inmuebles FROM fuente.catastro_parcela_inmuebles WHERE ref_catastral_14 = %s", (rc14,)
+        ).fetchone()
+        if fila:
+            return fila[0]
+        datos = _get(DNPRC, {"RefCat": rc14}).get("consulta_dnprcResult", {})
+        lista = (datos.get("lrcdnp") or {}).get("rcdnp")
+        if lista:
+            unidades = [_unidad(u.get("rc", {}), u.get("dt", {}), u.get("debi", {})) for u in lista]
+        elif (datos.get("bico") or {}).get("bi"):
+            # Parcela con un solo inmueble: la API devuelve directamente su ficha.
+            bi = datos["bico"]["bi"]
+            unidades = [_unidad(bi.get("idbi", {}).get("rc", {}), bi.get("dt", {}), bi.get("debi", {}))]
+        else:
+            log.info("parcela %s sin inmuebles en Catastro: %s", rc14, datos.get("lerr"))
+            unidades = []
+        conn.execute(
+            "INSERT INTO fuente.catastro_parcela_inmuebles (ref_catastral_14, inmuebles) VALUES (%s, %s) "
+            "ON CONFLICT (ref_catastral_14) DO UPDATE SET inmuebles = EXCLUDED.inmuebles, consultado_en = now()",
+            (rc14, json.dumps(unidades, ensure_ascii=False)),
+        )
+        return unidades

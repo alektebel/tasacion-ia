@@ -22,12 +22,12 @@ from psycopg.rows import dict_row
 
 from tasacion.fuentes import catastro_ovc
 from tasacion.ingesta import geocodificar
-from tasacion.scoring import avm, ipv
+from tasacion.scoring import avm, ipv, testigos_catastro
 from tasacion.store import DATABASE_URL
 
 log = logging.getLogger(__name__)
 
-VERSION = "reglas-v2"
+VERSION = "reglas-v3"
 UMBRAL_ROJO = 0.5
 UMBRAL_AMARILLO = 0.8
 MIN_TESTIGOS = 6                 # ECO/805: mínimo de comparables para el método de comparación
@@ -204,6 +204,31 @@ def r_distancia_testigos(testigos: list[dict]) -> list[Chequeo]:
                                "precision": {t["orden"]: t["geocodificacion_precision"] for t in medidos}})]
 
 
+def r_testigos_catastro(verificaciones: list[dict]) -> list[Chequeo]:
+    """Testigos que no caben en su parcela (uso o planta inexistentes) o con datos que no cuadran."""
+    evaluadas = [v for v in verificaciones if v["resultado"] in ("coherente", "discrepante", "no_encontrado")]
+    if not evaluadas:
+        return [Chequeo("TESTIGOS_CATASTRO", "calidad", "no_evaluable", "Ningún testigo con parcela catastral conocida")]
+    graves = {v["orden"]: [d["texto"] for d in v["diferencias"] if d.get("grave")] for v in evaluadas}
+    graves = {k: x for k, x in graves.items() if x}
+    leves = {v["orden"]: [d["texto"] for d in v["diferencias"] if not d.get("grave")]
+             for v in evaluadas if v["resultado"] == "discrepante"}
+    leves = {k: x for k, x in leves.items() if x}
+    out = []
+    if graves:
+        primero = next(iter(graves.items()))
+        out.append(Chequeo("TESTIGOS_NO_CABEN", "fraude", "fallo" if len(graves) > 1 else "aviso",
+                           f"Testigos sin un inmueble posible en su parcela catastral: {list(graves)} "
+                           f"(testigo {primero[0]}: {primero[1][0]})",
+                           min(1.0, 0.3 * len(graves)), observado=list(graves), evidencia={"testigos": graves}))
+    res = "ok" if not leves else ("fallo" if len(leves) * 2 >= len(evaluadas) else "aviso")
+    out.append(Chequeo("TESTIGOS_CATASTRO", "calidad", res,
+                       f"{len(evaluadas)} testigos contrastados con Catastro"
+                       + (f"; superficie o año no cuadran en {list(leves)}" if leves else ", sin discrepancias"),
+                       min(0.4, 0.08 * len(leves)), observado=list(leves), evidencia={"testigos": leves}))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # valor frente al AVM
 # ---------------------------------------------------------------------------
@@ -308,7 +333,12 @@ def puntuar(tasacion_id: int) -> dict:
                 WHERE t.finca_id = %s ORDER BY t.orden
                 """, (finca["id"],),
             ).fetchall()
-        chequeos += r_catastro(finca) + r_testigos(finca, testigos, t["metodo_principal"], t["fecha_emision"]) + r_avm(finca, t["fecha_emision"])
+        chequeos += r_catastro(finca) + r_testigos(finca, testigos, t["metodo_principal"], t["fecha_emision"])
+        if testigos:
+            # Se verifican los testigos de todas las fincas, pero se puntúan los de la principal.
+            ids = {x["id"] for x in testigos}
+            chequeos += r_testigos_catastro([v for v in testigos_catastro.verificar(tasacion_id) if v["testigo_id"] in ids])
+        chequeos += r_avm(finca, t["fecha_emision"])
 
     sub = {}
     for cat in ("valor", "calidad", "fraude"):
