@@ -20,6 +20,7 @@ uv run tasacion ingerir informe.pdf --operacion REF-BANCO-123   # extrae con Cla
 uv run tasacion ingerir informe.pdf --solo-json                 # sólo ver la extracción
 uv run tasacion geocodificar [ID...]                            # geolocaliza los testigos
 uv run tasacion puntuar [ID...]                                 # reglas y semáforo (geolocaliza si falta)
+uv run tasacion web                                             # ficha de cada tasación en http://127.0.0.1:8000
 ```
 
 Requiere credenciales de la API de Anthropic (`ANTHROPIC_API_KEY` o `ant auth login`). El esquema de extracción está en `src/tasacion/ingesta/esquema.py`.
@@ -27,6 +28,8 @@ Requiere credenciales de la API de Anthropic (`ANTHROPIC_API_KEY` o `ant auth lo
 Los testigos se geolocalizan en cascada: referencia catastral → callejero del Catastro cargado en local → CartoCiudad. Antes, un modelo ligero (`qwen3.6` en NAN, `NAN_API_KEY`) normaliza la dirección del informe. Sin esa clave, la regla de distancia queda como no evaluable.
 
 Con la parcela de cada testigo, `puntuar` contrasta el testigo con los inmuebles de esa parcela en Catastro: una sola consulta por parcela, guardada en `fuente.catastro_parcela_inmuebles`. Comprueba que haya un inmueble de ese uso en esa planta, con superficie (±25 %) y año (±5) parecidos.
+
+La vista web (`src/tasacion/web/`) muestra el semáforo, los motivos con su evidencia, el mapa (finca, testigos coloreados por el contraste con Catastro y comparables del AVM) y las citas del informe enlazadas a su página del PDF. El formulario de revisión guarda el veredicto del tasador en `scoring.revision`, junto con los motivos con los que está de acuerdo: con eso se calibrarán los umbrales. No tiene autenticación: es solo para uso local.
 
 ## Decisiones tomadas
 

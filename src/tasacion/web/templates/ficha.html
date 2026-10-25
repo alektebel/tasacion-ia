@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% set v = VEREDICTOS.get(score.veredicto if score else None, ("Sin puntuar", "gris")) %}
+
+{% macro valor(x) -%}
+  {%- if x is mapping -%}
+    <dl class="kv">{% for k, y in x.items() %}<dt>{{ k }}</dt><dd>{{ valor(y) }}</dd>{% endfor %}</dl>
+  {%- elif x is iterable and x is not string -%}
+    {%- if x and x[0] is mapping -%}<ol class="kv-lista">{% for y in x %}<li>{{ valor(y) }}</li>{% endfor %}</ol>
+    {%- else -%}{{ x|join(", ") if x else "—" }}{%- endif -%}
+  {%- elif x is none -%}—
+  {%- else -%}{{ x }}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro cita(e) -%}
+  <a class="cita" href="/tasacion/{{ t.id }}/pdf#page={{ e.pagina }}" target="_blank" title="{{ e.texto }}">p. {{ e.pagina }}</a>
+{%- endmacro %}
+
+{% block titulo %}{{ t.sociedad or "Tasación" }} #{{ t.id }}{% endblock %}
+{% block cabecera %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
+{% block contenido %}
+<a class="volver" href="/">← Todas las tasaciones</a>
+
+<section class="cabecera-ficha">
+  <div class="veredicto {{ v[1] }}">
+    <span class="semaforo grande {{ v[1] }}"></span>
+    <div>
+      <div class="veredicto-texto">{{ v[0] }}</div>
+      {% if score %}<div class="sub">Compuesto {{ score.compuesto|num(2) }} · {{ score.version }} · {{ score.created_at.strftime("%d/%m/%Y %H:%M") }}</div>{% endif %}
+    </div>
+  </div>
+  <div class="datos">
+    <h1>{{ t.sociedad or "Sociedad desconocida" }}</h1>
+    <p class="sub">
+      {% if t.num_informe %}Informe {{ t.num_informe }} · {% endif %}
+      {% if t.tecnico %}{{ t.tecnico|title }}{% if t.num_colegiado %} ({{ t.num_colegiado }}){% endif %} · {% endif %}
+      Emisión {{ t.fecha_emision or "—" }} · Visita {{ t.fecha_visita or "—" }}
+    </p>
+    {% if principal %}
+    <p class="inmueble">{{ principal.direccion or "Sin dirección en el informe" }}
+      <span class="sub">· {{ principal.tipo }}{% if principal.ref_catastral %} · RC {{ principal.ref_catastral }}{% endif %}</span></p>
+    {% endif %}
+  </div>
+  <div class="cifras">
+    <div><span class="sub">Valor de tasación</span><strong>{{ t.valor_tasacion|euros }}</strong></div>
+    {% if principal %}
+    <div><span class="sub">Unitario adoptado</span><strong>{{ principal.valor_unitario|num }} €/m²</strong></div>
+    <div><span class="sub">Superficie adoptada</span><strong>{{ principal.sup_adoptada|num(2) }} m²</strong></div>
+    {% endif %}
+    {% if t.storage_uri %}<a class="boton" href="/tasacion/{{ t.id }}/pdf" target="_blank">Abrir PDF</a>{% endif %}
+  </div>
+</section>
+
+{% if score %}
+<section class="subscores">
+  {% for cat, nombre in CATEGORIAS.items() %}
+    {% set s = score["sub_" ~ cat] %}
+    <div class="subscore">
+      <div class="fila"><span>{{ nombre }}</span><strong>{{ s|num(2) }}</strong></div>
+      <div class="barra-fondo"><div class="barra-valor {{ 'rojo' if s < 0.5 else ('ambar' if s < 0.8 else 'verde') }}" style="width: {{ (s * 100)|round }}%"></div></div>
+    </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section>
+  <h2>Motivos</h2>
+  {% set motivos = chequeos|selectattr("resultado", "in", ["fallo", "aviso"])|list %}
+  {% if not motivos %}<p class="sub">Ningún aviso ni fallo.</p>{% endif %}
+  <div class="motivos">
+  {% for c in motivos %}
+    <article class="motivo-card {{ c.resultado }}">
+      <header>
+        <span class="etiqueta {{ c.resultado }}">{{ c.resultado }}</span>
+        <code>{{ c.codigo }}</code>
+        <span class="sub">{{ CATEGORIAS[c.categoria] }}{% if c.bloqueante %} · <strong>bloqueante</strong>{% endif %} · severidad {{ c.severidad|num(2) }}</span>
+      </header>
+      <p>{{ c.explicacion }}</p>
+      {% if c.valor_esperado is not none and c.valor_esperado != "null" %}
+      <p class="sub">Observado: {{ valor(c.valor_observado) }} · Esperado: {{ valor(c.valor_esperado) }}</p>
+      {% endif %}
+      {% if c.evidencia %}
+      <details><summary>Evidencia</summary>{{ valor(c.evidencia) }}</details>
+      {% endif %}
+    </article>
+  {% endfor %}
+  </div>
+</section>
+
+<section class="mapa-testigos">
+  <h2>Testigos y comparables</h2>
+  <div id="mapa"></div>
+  <div class="leyenda">
+    <span><i class="punto finca"></i>Finca</span>
+    <span><i class="punto coherente"></i>Testigo coherente con Catastro</span>
+    <span><i class="punto discrepante"></i>Discrepante</span>
+    <span><i class="punto sin"></i>Sin contrastar</span>
+    <span><i class="punto comparable"></i>Comparable del AVM ({{ comparables|length }})</span>
+    <span><i class="aro"></i>2 km</span>
+  </div>
+
+  <div class="tabla-scroll">
+  <table class="testigos">
+    <thead><tr>
+      <th>#</th><th>Dirección</th><th>Fecha</th><th class="num">Sup. m²</th><th class="num">Precio</th>
+      <th class="num">€/m²</th><th class="num">Homog.</th><th class="num">Distancia</th><th>Catastro</th><th>Informe</th>
+    </tr></thead>
+    <tbody>
+    {% for x in testigos %}
+      <tr>
+        <td><span class="num-testigo {{ x.catastro or 'sin' }}">{{ x.orden }}</span>
+            {% if x.tipo_finca != (principal.tipo if principal else None) %}<div class="sub">{{ x.tipo_finca }}</div>{% endif %}</td>
+        <td>{{ x.direccion or "—" }}{% if x.planta %}<div class="sub">Planta {{ x.planta }}</div>{% endif %}</td>
+        <td>{{ x.fecha_dato or "—" }}</td>
+        <td class="num">{{ (x.sup_construida or x.sup_util)|num(2) }}{% if not x.sup_construida and x.sup_util %}<div class="sub">útil</div>{% endif %}</td>
+        <td class="num">{{ x.precio|euros }}</td>
+        <td class="num">{{ x.precio_unitario|num }}</td>
+        <td class="num">{{ x.coef_homogeneizacion|num(3) }}</td>
+        <td class="num">{% if x.distancia_m is not none %}{{ (x.distancia_m / 1000)|num(2) }} km{% else %}—{% endif %}
+            {% if x.geocodificacion_precision %}<div class="sub">{{ x.geocodificacion_precision }}</div>{% endif %}</td>
+        <td>{% if x.catastro %}<span class="etiqueta {{ 'ok' if x.catastro == 'coherente' else ('fallo' if x.catastro in ['discrepante', 'no_encontrado'] else 'neutro') }}">{{ x.catastro|replace("_", " ") }}</span>
+              {% for d in (x.catastro_detalle or {}).get("diferencias", []) if x.catastro != "coherente" %}<div class="sub">{{ d.texto }}</div>{% endfor %}
+              {% if (x.catastro_detalle or {}).get("rc14") %}<div class="sub mono">{{ x.catastro_detalle.rc14 }}</div>{% endif %}
+            {% else %}—{% endif %}</td>
+        <td>{% for e in x.citas[:1] %}{{ cita(e) }}{% else %}—{% endfor %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <details>
+    <summary><h2>Todos los chequeos ({{ chequeos|length }})</h2></summary>
+    <table class="chequeos">
+      <tbody>
+      {% for c in chequeos %}
+        <tr><td><span class="etiqueta {{ c.resultado }}">{{ c.resultado|replace("_", " ") }}</span></td>
+            <td><code>{{ c.codigo }}</code></td><td>{{ c.explicacion }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% if avisos %}
+  <details>
+    <summary><h2>Notas de la extracción ({{ avisos|length }})</h2></summary>
+    <ul class="avisos">
+    {% for a in avisos %}
+      <li><span class="etiqueta {{ 'fallo' if a.gravedad == 'alta' else ('aviso' if a.gravedad == 'media' else 'neutro') }}">{{ a.tipo }} · {{ a.gravedad }}</span> {{ a.texto }}</li>
+    {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+  <details>
+    <summary><h2>Citas del informe ({{ n_evidencias }})</h2></summary>
+    <table class="chequeos">
+      <tbody>
+      {% for e in evidencias %}
+        <tr><td><code>{{ e.ruta }}</code></td><td>{{ e.texto }}</td><td>{{ cita(e) }}</td>
+            <td>{% if e.confianza != "alta" %}<span class="etiqueta aviso">{{ e.confianza }}</span>{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+
+<section id="revision" class="revision">
+  <h2>Revisión del tasador</h2>
+  <p class="sub">Tu veredicto se guarda junto al del sistema y es lo que servirá para calibrar los umbrales.</p>
+  <form method="post" action="/tasacion/{{ t.id }}/revision">
+    <div class="campos">
+      <label>Revisor<input name="revisor" required autocomplete="name"></label>
+      <label>Veredicto
+        <select name="veredicto" required>
+          <option value="" disabled selected>Elige…</option>
+          {% for k, (nombre, _) in VEREDICTOS.items() %}<option value="{{ k }}">{{ nombre }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Valor que darías (€)<input name="valor_estimado" inputmode="decimal" placeholder="Opcional"></label>
+    </div>
+    {% if motivos %}
+    <fieldset>
+      <legend>Motivos del sistema con los que estás de acuerdo</legend>
+      {% for c in motivos %}
+      <label class="check"><input type="checkbox" name="motivos" value="{{ c.codigo }}"> <code>{{ c.codigo }}</code> {{ c.explicacion|truncate(110) }}</label>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
+    <label>Comentario<textarea name="comentario" rows="3" placeholder="Qué ha visto el sistema mal, o qué se le ha escapado"></textarea></label>
+    <button class="boton" type="submit">Guardar revisión</button>
+  </form>
+
+  {% for r in revisiones %}
+  {% set rv = VEREDICTOS[r.veredicto] %}
+  <div class="revision-hecha">
+    <span class="semaforo {{ rv[1] }}"></span> <strong>{{ rv[0] }}</strong> · {{ r.revisor }} · {{ r.created_at.strftime("%d/%m/%Y %H:%M") }}
+    {% if r.valor_estimado %} · {{ r.valor_estimado|euros }}{% endif %}
+    {% if r.motivos %}<div class="sub">De acuerdo con: {{ r.motivos|join(", ") }}</div>{% endif %}
+    {% if r.comentario %}<p>{{ r.comentario }}</p>{% endif %}
+  </div>
+  {% endfor %}
+</section>
+
+<script id="datos-mapa" type="application/json">{{ mapa_json|safe }}</script>
+<script src="{{ url_for('static', path='mapa.js') }}"></script>
+{% endblock %}

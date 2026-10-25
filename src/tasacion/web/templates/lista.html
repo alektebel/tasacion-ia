@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block contenido %}
+<h1>Tasaciones</h1>
+<p class="sub">{{ tasaciones|length }} informes. Veredicto del último scoring; los motivos van del más grave al más leve.</p>
+
+<div class="tabla-scroll">
+<table class="lista">
+  <thead>
+    <tr><th></th><th>Informe</th><th>Inmueble</th><th>Emisión</th><th class="num">Valor</th><th>Motivo principal</th><th>Revisión</th></tr>
+  </thead>
+  <tbody>
+  {% for t in tasaciones %}
+    {% set v = VEREDICTOS.get(t.veredicto, ("Sin puntuar", "gris")) %}
+    <tr onclick="location.href='/tasacion/{{ t.id }}'">
+      <td><span class="semaforo {{ v[1] }}" title="{{ v[0] }}"></span></td>
+      <td><a href="/tasacion/{{ t.id }}"><strong>{{ t.sociedad or "Sociedad desconocida" }}</strong></a>
+          <div class="sub">#{{ t.id }}{% if t.num_informe %} · {{ t.num_informe }}{% endif %}</div></td>
+      <td>{{ t.direccion or "—" }}<div class="sub">{{ t.municipio or "" }}</div></td>
+      <td>{{ t.fecha_emision or "—" }}</td>
+      <td class="num">{{ t.valor_tasacion|euros }}</td>
+      <td class="motivo">{% if t.motivos %}{{ t.motivos[0].explicacion }}
+          {% if t.motivos|length > 1 %}<span class="sub">+{{ t.motivos|length - 1 }} más</span>{% endif %}{% else %}—{% endif %}</td>
+      <td>{% if t.revisiones %}<span class="chip">{{ t.revisiones }} revisión{{ "es" if t.revisiones > 1 }}</span>{% else %}<span class="sub">Pendiente</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

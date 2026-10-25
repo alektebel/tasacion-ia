@@ -145,6 +145,14 @@ def geocodificar(
     _print(g.testigos(tasacion_id or None, rehacer))
 
 
+@app.command("web")
+def web(host: str = "127.0.0.1", puerto: int = 8000, recargar: bool = False):
+    """Vista web local: listado de tasaciones y ficha con semáforo, motivos, evidencia y mapa."""
+    import uvicorn
+
+    uvicorn.run("tasacion.web.app:app", host=host, port=puerto, reload=recargar)
+
+
 @app.command("avm")
 def avm(lat: float, lon: float, sup: float = typer.Argument(..., help="Superficie construida, m²")):
     """Valor estimado por comparables para un punto y una superficie (sin guardar)."""
