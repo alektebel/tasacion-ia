@@ -18,9 +18,13 @@ Todas las vías de instalación (Docker, Postgres nativo, gestionado, pip, GDAL)
 ```bash
 uv run tasacion ingerir informe.pdf --operacion REF-BANCO-123   # extrae con Claude y carga en tasacion.*
 uv run tasacion ingerir informe.pdf --solo-json                 # sólo ver la extracción
+uv run tasacion geocodificar [ID...]                            # geolocaliza los testigos
+uv run tasacion puntuar [ID...]                                 # reglas y semáforo (geolocaliza si falta)
 ```
 
 Requiere credenciales de la API de Anthropic (`ANTHROPIC_API_KEY` o `ant auth login`). El esquema de extracción está en `src/tasacion/ingesta/esquema.py`.
+
+Los testigos se geolocalizan en cascada: referencia catastral → callejero del Catastro cargado en local → CartoCiudad. Antes, un modelo ligero (`qwen3.6` en NAN, `NAN_API_KEY`) normaliza la dirección del informe. Sin esa clave, la regla de distancia queda como no evaluable.
 
 ## Decisiones tomadas
 

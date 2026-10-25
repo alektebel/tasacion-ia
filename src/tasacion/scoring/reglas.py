@@ -16,20 +16,25 @@ import statistics
 from dataclasses import dataclass, field
 from datetime import date
 
+import httpx
 import psycopg
 from psycopg.rows import dict_row
 
 from tasacion.fuentes import catastro_ovc
+from tasacion.ingesta import geocodificar
 from tasacion.scoring import avm, ipv
 from tasacion.store import DATABASE_URL
 
 log = logging.getLogger(__name__)
 
-VERSION = "reglas-v1"
+VERSION = "reglas-v2"
 UMBRAL_ROJO = 0.5
 UMBRAL_AMARILLO = 0.8
 MIN_TESTIGOS = 6                 # ECO/805: mínimo de comparables para el método de comparación
 VALIDEZ_MAX_DIAS = 183           # validez de 6 meses del certificado
+TESTIGO_LEJOS_M = 2000           # testigo fuera del entorno de la finca (provisional)
+TESTIGO_MUY_LEJOS_M = 5000
+HOLGURA_CALLE_M = 500            # sin portal, el punto es el centro de la vía
 
 
 @dataclass
@@ -136,6 +141,8 @@ def r_testigos(finca: dict, testigos: list[dict], metodo: str | None, emision: d
                                f"Testigos fechados después de la emisión del informe ({emision}): {posteriores}",
                                min(1.0, 0.3 * len(posteriores)), bloqueante=True, observado=posteriores))
 
+    out += r_distancia_testigos(testigos)
+
     sin_fuente = [t["orden"] for t in testigos if not (t["url"] or t["fuente"])]
     out.append(Chequeo("TESTIGOS_TRAZABLES", "calidad", "aviso" if sin_fuente else "ok",
                        "Todos los testigos indican su fuente" if not sin_fuente
@@ -165,6 +172,36 @@ def r_testigos(finca: dict, testigos: list[dict], metodo: str | None, emision: d
                            f"Valor unitario adoptado {finca['valor_unitario']} €/m² frente a media homogeneizada "
                            f"{media:.0f} €/m² ({d:+.1%})", sev, observado=finca["valor_unitario"], esperado=round(media, 2)))
     return out
+
+
+def r_distancia_testigos(testigos: list[dict]) -> list[Chequeo]:
+    """La ECO/805 pide comparables del mismo mercado local: un testigo a kilómetros no lo es."""
+    medidos = [t for t in testigos if t.get("distancia_m") is not None]
+    if not medidos:
+        return [Chequeo("TESTIGOS_DISTANCIA", "calidad", "no_evaluable",
+                        "Sin coordenadas de la finca o de los testigos")]
+    lejos, muy_lejos = [], []
+    for t in medidos:
+        d = float(t["distancia_m"]) - (HOLGURA_CALLE_M if t["geocodificacion_precision"] == "calle" else 0)
+        if d > TESTIGO_LEJOS_M:
+            lejos.append(t["orden"])
+        if d > TESTIGO_MUY_LEJOS_M:
+            muy_lejos.append(t["orden"])
+    distancias = {t["orden"]: round(float(t["distancia_m"])) for t in medidos}
+    mediana = statistics.median(distancias.values())
+    if muy_lejos or len(lejos) * 2 >= len(medidos):
+        res = "fallo"
+    elif lejos:
+        res = "aviso"
+    else:
+        res = "ok"
+    texto = (f"Testigos a más de {TESTIGO_LEJOS_M / 1000:g} km de la finca: {lejos}" if lejos
+             else f"Todos los testigos a menos de {TESTIGO_LEJOS_M / 1000:g} km de la finca")
+    return [Chequeo("TESTIGOS_DISTANCIA", "calidad", res,
+                    f"{texto} (mediana {mediana / 1000:.1f} km; {len(medidos)} de {len(testigos)} localizados)",
+                    min(0.4, 0.1 * len(lejos) + 0.2 * len(muy_lejos)), observado=lejos,
+                    evidencia={"distancias_m": distancias,
+                               "precision": {t["orden"]: t["geocodificacion_precision"] for t in medidos}})]
 
 
 # ---------------------------------------------------------------------------
@@ -248,10 +285,6 @@ def puntuar(tasacion_id: int) -> dict:
             "SELECT *, ST_Y(geom) AS lat, ST_X(geom) AS lon FROM tasacion.finca WHERE tasacion_id = %s "
             "ORDER BY es_principal DESC, orden LIMIT 1", (tasacion_id,)
         ).fetchone()
-        testigos = conn.execute(
-            "SELECT * FROM tasacion.testigo WHERE finca_id = %s ORDER BY orden", (finca["id"],)
-        ).fetchall() if finca else []
-
     chequeos = r_informe(t) + r_alcance(t, finca)
     if finca and not any(c.codigo == "ALCANCE" for c in chequeos):
         # Geolocalizar la finca por su referencia catastral si el informe no trae coordenadas.
@@ -263,6 +296,18 @@ def puntuar(tasacion_id: int) -> dict:
                     conn.execute(
                         "UPDATE tasacion.finca SET geom = ST_SetSRID(ST_MakePoint(%s, %s), 4326), "
                         "geocodificacion_fuente = 'catastro' WHERE id = %s", (coords[1], coords[0], finca["id"]))
+        try:
+            geocodificar.testigos([tasacion_id])
+        except (RuntimeError, httpx.HTTPError) as exc:
+            log.warning("tasación %d: no se pudieron geolocalizar los testigos: %s", tasacion_id, exc)
+        with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+            testigos = conn.execute(
+                """
+                SELECT t.*, ST_Distance(t.geom::geography, f.geom::geography) AS distancia_m
+                FROM tasacion.testigo t JOIN tasacion.finca f ON f.id = t.finca_id
+                WHERE t.finca_id = %s ORDER BY t.orden
+                """, (finca["id"],),
+            ).fetchall()
         chequeos += r_catastro(finca) + r_testigos(finca, testigos, t["metodo_principal"], t["fecha_emision"]) + r_avm(finca, t["fecha_emision"])
 
     sub = {}

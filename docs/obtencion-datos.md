@@ -58,7 +58,7 @@ No se descargan en bloque. Se llaman para cada finca y la respuesta se guarda en
 | Fuente | Para qué | Límites | Estado |
 |---|---|---|---|
 | Catastro OVC (`Consulta_DNPRC`, `Consulta_DNPLOC`, `Consulta_RCCOOR`, `Consulta_CPMRC`) | Superficie, uso, año, planta y coordenadas por ref. catastral → `fuente.catastro_inmueble` | Menos de 1 petición/s. Si se abusa, el Catastro bloquea la IP unos 10 días. | 🔲 Por implementar |
-| CartoCiudad (`geocoder/find`, `reverseGeocode`) | Geocodificar la dirección de la tasación y de los testigos; obtener CP y ref. catastral | Uso razonable | 🔲 Por implementar |
+| CartoCiudad (`geocoder/find`, `reverseGeocode`) | Geocodificar la dirección de la tasación y de los testigos; obtener CP y ref. catastral | Uso razonable | ✅ Testigos (`candidates` con `cod_postal_filter`), como respaldo del callejero del Catastro local |
 | IDEE WMS de inundaciones (`GetFeatureInfo`) | ¿Está la finca en zona inundable T10, T100 o T500? | — | 🔲 Por implementar |
 | PNOA (WMS del IGN) | Ortofoto de la parcela para la vista de revisión | — | 🔲 Por implementar (P2) |
 | Ficha de subasta del BOE (`detalleSubasta.php`) | Valor de tasación y puja de una subasta concreta | Solo consulta puntual (`robots.txt` bloquea el portal) | 🔲 Por implementar (P2) |

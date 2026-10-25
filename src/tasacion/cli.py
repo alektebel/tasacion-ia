@@ -134,6 +134,17 @@ def ingerir(
                    f"{len(extraida.avisos_extraccion)} avisos)")
 
 
+@app.command("geocodificar")
+def geocodificar(
+    tasacion_id: list[int] = typer.Argument(None, help="Ids de tasación; por defecto, todas"),
+    rehacer: bool = typer.Option(False, help="Volver a geolocalizar también los testigos que ya tienen punto"),
+):
+    """Geolocaliza los testigos: referencia catastral, callejero del Catastro o CartoCiudad."""
+    from tasacion.ingesta import geocodificar as g
+
+    _print(g.testigos(tasacion_id or None, rehacer))
+
+
 @app.command("avm")
 def avm(lat: float, lon: float, sup: float = typer.Argument(..., help="Superficie construida, m²")):
     """Valor estimado por comparables para un punto y una superficie (sin guardar)."""
