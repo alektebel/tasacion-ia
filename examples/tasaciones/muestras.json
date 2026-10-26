@@ -1,0 +1,45 @@
+{
+  "coslada": {
+    "archivo": "segipsa_residencial.pdf",
+    "url": "https://www.mjusticia.gob.es/es/AreaTematica/OficinaRecuperacion/Documents/2021-10-21%20Exp-20210094%20Tasaci%C3%B3n%20finca.pdf",
+    "editor": "Ministerio de Justicia / ORGA",
+    "autor": "THIRSA para SEGIPSA",
+    "verificado": "2026-10-26",
+    "sha256": "355b0bdb0f1c959997f64fd15e2dcf478e54bfae017b8c40dc367e20516f61bb",
+    "paginas_pdf": 37,
+    "alcance": "Informe público residencial de valor de mercado; declara no ser válido para finalidades ECO/805. Prueba de extracción, no ejemplo de cumplimiento hipotecario.",
+    "campos": {
+      "/fecha_emision": "2021-09-10",
+      "/fecha_visita": "2021-09-07",
+      "/fecha_caducidad": "2022-09-10",
+      "/metodo_principal": "comparacion",
+      "/valor_tasacion": 180025.46,
+      "/fincas/0/tipo": "vivienda",
+      "/fincas/0/ref_catastral": "4358001VK5745N0016SJ",
+      "/fincas/0/sup_adoptada": 103.0,
+      "/fincas/0/valor_finca": 180025.46
+    },
+    "recuentos": {"/fincas": 1, "/fincas/0/testigos": 6},
+    "paginas_revision": {"identificacion": 4, "superficie": 8, "testigos": [16, 17], "valor": 19, "fechas": 21}
+  },
+  "valencia": {
+    "archivo": "valencia_pr331424.pdf",
+    "url": "https://www.valencia.es/ayuntamiento/urbanismo2.nsf/0/6098D4F0CC8EB58CC1258B10001DFC05/%24FILE/2_PJE_Anexo2_Tasacion_PR331424CE_F_unlocked_firmado.pdf?OpenElement=",
+    "editor": "Ayuntamiento de València",
+    "autor": "EUROVALORACIONES, S.A.",
+    "verificado": "2026-10-26",
+    "sha256": "ba51d79784bcde18324f3303ee21aaf292239349a65d65d2733b223886dd0c51",
+    "paginas_pdf": 73,
+    "alcance": "Suelo urbano no consolidado, asesoramiento fuera del ámbito ECO/805. Caso de extracción de múltiples fincas y derivación a revisión por alcance.",
+    "campos": {
+      "/num_informe": "14970/2024",
+      "/sociedad_codigo_bde": "4388",
+      "/fecha_emision": "2024-03-21",
+      "/metodo_principal": "residual_estatico",
+      "/valor_tasacion": 1155057.73,
+      "/fincas/0/tipo": "otro"
+    },
+    "recuentos": {"/fincas": 21},
+    "paginas_revision": {"resumen": 3}
+  }
+}

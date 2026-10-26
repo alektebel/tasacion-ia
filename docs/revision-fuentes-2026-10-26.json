@@ -1,0 +1,141 @@
+{
+  "fecha": "2026-10-26",
+  "metodo": "GET con User-Agent del proyecto; comprobación de formato/estructura, no auditoría exhaustiva del contenido ni de licencias",
+  "resultados": [
+    {
+      "id": "catastro_ovc",
+      "url": "https://ovc.catastro.meh.es/OVCServWeb/OVCWcfCallejero/COVCCallejero.svc/json/Consulta_DNPRC?RefCat=001000200VK58D",
+      "status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "bytes": 1756,
+      "sha256": "ad19b50b8b1ada72b58094f1cd231440c828d439ad69cae6ce7bfe15621240e8",
+      "structure": [
+        "consulta_dnprcResult"
+      ]
+    },
+    {
+      "id": "catastro_inspire",
+      "url": "https://www.catastro.hacienda.gob.es/INSPIRE/buildings/ES.SDGC.BU.atom.xml",
+      "status": 200,
+      "content_type": "text/xml",
+      "bytes": 682565,
+      "sha256": "6b60f42087114a090db59aebba2590102fe840ac205ec1203665d4b49c5e2996"
+    },
+    {
+      "id": "mivau",
+      "url": "https://apps.fomento.gob.es/BoletinOnline2/sedal/35101000.XLS",
+      "status": 200,
+      "content_type": "application/vnd.ms-excel",
+      "bytes": 236032,
+      "sha256": "a5999820279a86fdb4aae386ec914939db12d9fef7ba6e5715e0a062a0b72501"
+    },
+    {
+      "id": "ine_ipv",
+      "url": "https://servicios.ine.es/wstempus/js/ES/DATOS_TABLA/80270?nult=1",
+      "status": 200,
+      "content_type": "application/json;charset=UTF-8",
+      "bytes": 53840,
+      "sha256": "a67d104bad518a58b439af680d41b19f939fe7a3b77b407e8dc462099a8ffb5f",
+      "structure": {
+        "rows": 240
+      }
+    },
+    {
+      "id": "registradores_csv",
+      "url": "https://opendata.registradores.org/data-integration/compraventas-residencial-trimestres-provincias-es/RP_ComprvResid_2007-2t2026.csv",
+      "status": 200,
+      "content_type": "text/csv",
+      "bytes": 577369,
+      "sha256": "3049f4057c4795c6821c49b16b2b07fa55490c7458bf39db72dd89495a26b7a0"
+    },
+    {
+      "id": "registradores_ficha",
+      "url": "https://opendata.registradores.org/dataset/dataset/compraventas-de-inmuebles-uso-residencial-por-provincia",
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 21576,
+      "sha256": "92b93579f6675138a9cb02beae42bb3a8b6a9f0e8db49aac10d13ee76e0df3e9"
+    },
+    {
+      "id": "boe",
+      "url": "https://www.boe.es/datosabiertos/api/boe/sumario/20261024",
+      "status": 200,
+      "content_type": "application/json",
+      "bytes": 375361,
+      "sha256": "87824b834036d394a948c5697e959935a691de247b4e522a2d57f99b584516a0",
+      "structure": [
+        "status",
+        "data"
+      ]
+    },
+    {
+      "id": "cartociudad",
+      "url": "https://www.cartociudad.es/geocoder/api/geocoder/candidates?q=calle%20alcala%20100%20madrid&limit=1",
+      "status": 200,
+      "content_type": "application/json",
+      "bytes": 484,
+      "sha256": "e4ef9b07b654f422055f5480720bb787e6efb01cd20b8057641c53cdfb89ff9f",
+      "structure": {
+        "rows": 1
+      }
+    },
+    {
+      "id": "inundaciones",
+      "url": "https://servicios.idee.es/wms-inspire/riesgos-naturales/inundaciones?service=WMS&request=GetCapabilities",
+      "status": 200,
+      "content_type": "text/xml",
+      "bytes": 19821,
+      "sha256": "0cfc8a42ffa1bc91c8db6ce3c3b2de644334b6d47287486c0e56fb822060be5e"
+    },
+    {
+      "id": "pnoa",
+      "url": "https://www.ign.es/wms-inspire/pnoa-ma?service=WMS&request=GetCapabilities",
+      "status": 200,
+      "content_type": "text/xml",
+      "bytes": 27902,
+      "sha256": "907f75b17d07c1ddc6f2dfcf2a04efa7c66de4b1ea7e46e0c2524a9dfdebad52"
+    },
+    {
+      "id": "cee_madrid",
+      "url": "https://datos.comunidad.madrid/api/3/action/package_show?id=registro_certificados_eficiencia_energetica",
+      "status": 200,
+      "content_type": "application/json;charset=utf-8",
+      "bytes": 6410,
+      "sha256": "a045b390579a1382a610edccb285b3688a9bc70644d4575f811bf5b4e2326667",
+      "structure": [
+        "help",
+        "success",
+        "result"
+      ]
+    },
+    {
+      "id": "cee_cataluna",
+      "url": "https://analisi.transparenciacatalunya.cat/resource/j6ii-t3w2.json?$limit=1",
+      "status": 200,
+      "content_type": "application/json;charset=utf-8",
+      "bytes": 1494,
+      "sha256": "51d04f84c306dd068cac59843762aede0f674ec22753f1990478b293e8a397aa",
+      "structure": {
+        "rows": 1
+      }
+    },
+    {
+      "id": "muestra_coslada",
+      "url": "https://www.mjusticia.gob.es/es/AreaTematica/OficinaRecuperacion/Documents/2021-10-21%20Exp-20210094%20Tasaci%C3%B3n%20finca.pdf",
+      "status": 200,
+      "content_type": "application/pdf",
+      "bytes": 1861291,
+      "sha256": "355b0bdb0f1c959997f64fd15e2dcf478e54bfae017b8c40dc367e20516f61bb",
+      "matches_local": true
+    },
+    {
+      "id": "muestra_valencia",
+      "url": "https://www.valencia.es/ayuntamiento/urbanismo2.nsf/0/6098D4F0CC8EB58CC1258B10001DFC05/%24FILE/2_PJE_Anexo2_Tasacion_PR331424CE_F_unlocked_firmado.pdf?OpenElement=",
+      "status": 200,
+      "content_type": "application/pdf",
+      "bytes": 10364922,
+      "sha256": "ba51d79784bcde18324f3303ee21aaf292239349a65d65d2733b223886dd0c51",
+      "matches_local": true
+    }
+  ]
+}

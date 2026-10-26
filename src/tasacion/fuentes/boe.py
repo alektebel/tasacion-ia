@@ -1,4 +1,4 @@
-"""Sumarios diarios del BOE (API de datos abiertos). Los anuncios de subastas van en la sección V-B.
+"""Sumarios diarios del BOE (API abierta): subastas administrativas en V-B y judiciales en IV.
 
 El portal subastas.boe.es tiene robots.txt `Disallow: /`, así que se usa sólo la API abierta.
 """

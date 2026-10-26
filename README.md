@@ -11,6 +11,8 @@ uv sync
 
 Vías de obtención de datos y su estado: [`docs/obtencion-datos.md`](docs/obtencion-datos.md). Catálogo de fuentes: [`docs/fuentes.md`](docs/fuentes.md).
 
+Revisión de fuentes, integración real y pendientes (26-10-2026): [`docs/revision-fuentes.md`](docs/revision-fuentes.md).
+
 Todas las vías de instalación (Docker, Postgres nativo, gestionado, pip, GDAL) y la estimación de disco: [`docs/instalacion.md`](docs/instalacion.md).
 
 ## Ingesta de tasaciones
@@ -24,6 +26,15 @@ uv run tasacion web                                             # ficha de cada 
 ```
 
 Requiere credenciales de la API de Anthropic (`ANTHROPIC_API_KEY` o `ant auth login`). El esquema de extracción está en `src/tasacion/ingesta/esquema.py`.
+
+Hay [informes públicos oficiales para probar el parser](docs/muestras-parser.md), con URLs, hashes y valores de referencia. Para descargar y verificar uno sin BD ni LLM:
+
+```bash
+uv run python -m tasacion.ingesta.muestras coslada
+# Añadir --extraer para ejecutar el parser con Anthropic y comprobar sus resultados.
+```
+
+Son pruebas de extracción: los ejemplos oficiales verificados tienen finalidades fuera del ámbito hipotecario. `reglas-v4` los deriva a revisión; también impide validar cuando un contraste devuelve `no_evaluable`.
 
 Los testigos se geolocalizan en cascada: referencia catastral → callejero del Catastro cargado en local → CartoCiudad. Antes, un modelo ligero (`qwen3.6` en NAN, `NAN_API_KEY`) normaliza la dirección del informe. Sin esa clave, la regla de distancia queda como no evaluable.
 

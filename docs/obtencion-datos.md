@@ -2,6 +2,8 @@
 
 Cómo entra en el sistema cada dato y en qué estado está.
 
+Las cifras y estados «en curso/en cola» de las tablas son una fotografía del 24-10-2026, no procesos cuya ejecución actual se haya confirmado. Ver el [inventario y revisión del 26-10-2026](revision-fuentes.md) y las [muestras oficiales para el parser](muestras-parser.md).
+
 - El **catálogo** de cada fuente (qué verifica, licencia, URLs probadas) está en [`fuentes.md`](fuentes.md).
 - La **instalación** y los comandos de descarga están en [`instalacion.md`](instalacion.md).
 
@@ -31,7 +33,7 @@ Hay siete vías de obtención:
 | Registradores: €/m² y compraventas por provincia | CSV (ODbL) | ídem | Trimestral | ✅ 0,6 MB |
 | Certificados energéticos: Madrid, C. Valenciana, Canarias, Cataluña | CSV/ZIP | `tasacion descargar certificados` | Mensual o semestral | ✅ 1,1 GB |
 | Certificados energéticos: Aragón | CSV | ídem | — | ❌ SSL roto en el servidor de origen |
-| Sumarios del BOE (subastas en la sección V-B) | JSON | `tasacion descargar boe` | Diario | ⏳ En curso desde 2015 |
+| Sumarios del BOE (subastas administrativas en V-B y judiciales en IV) | JSON | `tasacion descargar boe` | Diario | ⏳ En curso desde 2015 |
 | Anuncios de subasta administrativa del BOE (sección V-B: Seguridad Social, Hacienda, Defensa) | XML (`/diario_boe/xml.php?id=BOE-B-...`), con ref. catastral y m² | `tasacion descargar boe-subastas` | Diario | ⏳ En curso (unos 15.000) |
 | Subastas judiciales del BOE (sección IV) | El BOE solo publica el id `SUB-JA-…`; el valor está en subastas.boe.es (bloqueado por robots.txt) | — | — | ⛔ Solo el identificador |
 | INE, renta por sección censal (ADRH, 2015–2024) | CSV | `tasacion descargar abiertos --fuente ine_adrh` | Anual | ⏳ 54 tablas |
@@ -53,11 +55,11 @@ Hay siete vías de obtención:
 
 ## 2. API pública por consulta (al puntuar cada tasación)
 
-No se descargan en bloque. Se llaman para cada finca y la respuesta se guarda en `ingest.raw_file` y en la tabla correspondiente, para no repetir la consulta.
+No se descargan en bloque. Las consultas implementadas de OVC se cachean en `fuente.catastro_inmueble` y `fuente.catastro_parcela_inmuebles`; no todas las respuestas de las APIs por consulta se registran en `ingest.raw_file`.
 
 | Fuente | Para qué | Límites | Estado |
 |---|---|---|---|
-| Catastro OVC (`Consulta_DNPRC`, `Consulta_DNPLOC`, `Consulta_RCCOOR`, `Consulta_CPMRC`) | Superficie, uso, año, planta y coordenadas por ref. catastral → `fuente.catastro_inmueble` | Menos de 1 petición/s. Si se abusa, el Catastro bloquea la IP unos 10 días. | 🔲 Por implementar |
+| Catastro OVC (`Consulta_DNPRC`, `Consulta_CPMRC`) | Superficie, uso, año y coordenadas; unidades por parcela → `fuente.catastro_inmueble` / `fuente.catastro_parcela_inmuebles` | Pausa de 1,5 s por proceso y caché local; no hay caducidad automática | ✅ Implementado en `fuentes/catastro_ovc.py` y conectado al scoring; DNPLOC/RCCOOR no son parte de este cliente |
 | CartoCiudad (`geocoder/find`, `reverseGeocode`) | Geocodificar la dirección de la tasación y de los testigos; obtener CP y ref. catastral | Uso razonable | ✅ Testigos (`candidates` con `cod_postal_filter`), como respaldo del callejero del Catastro local |
 | IDEE WMS de inundaciones (`GetFeatureInfo`) | ¿Está la finca en zona inundable T10, T100 o T500? | — | 🔲 Por implementar |
 | PNOA (WMS del IGN) | Ortofoto de la parcela para la vista de revisión | — | 🔲 Por implementar (P2) |

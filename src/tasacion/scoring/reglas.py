@@ -4,7 +4,7 @@ Cada regla devuelve un Chequeo con resultado ok / aviso / fallo / no_evaluable, 
 0-1 que resta del sub-score de su categoría y la evidencia que lo justifica. El veredicto:
 
 - revision_obligatoria: algún fallo de una regla bloqueante, o algún sub-score < UMBRAL_ROJO
-- dudas:                algún fallo, o algún sub-score < UMBRAL_AMARILLO
+- dudas:                algún fallo, contraste no evaluable o sub-score < UMBRAL_AMARILLO
 - validada:             el resto
 
 Los umbrales son provisionales hasta calibrarlos con las revisiones del tasador senior.
@@ -27,7 +27,7 @@ from tasacion.store import DATABASE_URL
 
 log = logging.getLogger(__name__)
 
-VERSION = "reglas-v3"
+VERSION = "reglas-v4"
 UMBRAL_ROJO = 0.5
 UMBRAL_AMARILLO = 0.8
 MIN_TESTIGOS = 6                 # ECO/805: mínimo de comparables para el método de comparación
@@ -290,13 +290,24 @@ def r_informe(t: dict) -> list[Chequeo]:
 
 
 def r_alcance(t: dict, finca: dict | None) -> list[Chequeo]:
-    """El v1 sólo valida vivienda terminada por comparación; el resto se deriva a revisión."""
-    if finca is None or finca["tipo"] != "vivienda" or t["metodo_principal"] not in (None, "comparacion"):
+    """El v1 revisa vivienda hipotecaria por comparación; finalidad desconocida exige revisión."""
+    if (finca is None or finca["tipo"] != "vivienda" or t["metodo_principal"] != "comparacion"
+            or t.get("finalidad") != "garantia_hipotecaria"):
         return [Chequeo("ALCANCE", "calidad", "fallo",
                         f"Fuera del alcance del v1 (finca principal «{finca['tipo'] if finca else '-'}», "
-                        f"método «{t['metodo_principal']}»): requiere revisión manual",
+                        f"método «{t['metodo_principal']}», finalidad «{t.get('finalidad')}»): requiere revisión manual",
                         0.0, bloqueante=True)]
     return []
+
+
+def veredicto(chequeos: list[Chequeo], sub: dict[str, float]) -> str:
+    """La falta de datos externos nunca equivale a un contraste favorable."""
+    if any(c.bloqueante and c.resultado == "fallo" for c in chequeos) or min(sub.values()) < UMBRAL_ROJO:
+        return "revision_obligatoria"
+    if (not chequeos or any(c.resultado in ("fallo", "no_evaluable") for c in chequeos)
+            or min(sub.values()) < UMBRAL_AMARILLO):
+        return "dudas"
+    return "validada"
 
 
 # ---------------------------------------------------------------------------
@@ -344,12 +355,7 @@ def puntuar(tasacion_id: int) -> dict:
     for cat in ("valor", "calidad", "fraude"):
         sub[cat] = max(0.0, 1 - sum(c.severidad for c in chequeos if c.categoria == cat and c.resultado in ("aviso", "fallo")))
     compuesto = 0.5 * sub["valor"] + 0.3 * sub["calidad"] + 0.2 * sub["fraude"]
-    if any(c.bloqueante and c.resultado == "fallo" for c in chequeos) or min(sub.values()) < UMBRAL_ROJO:
-        veredicto = "revision_obligatoria"
-    elif any(c.resultado == "fallo" for c in chequeos) or min(sub.values()) < UMBRAL_AMARILLO:
-        veredicto = "dudas"
-    else:
-        veredicto = "validada"
+    resultado = veredicto(chequeos, sub)
 
     with psycopg.connect(DATABASE_URL) as conn:
         ids = []
@@ -366,14 +372,14 @@ def puntuar(tasacion_id: int) -> dict:
             ).fetchone()[0])
         motivos = sorted(
             ({"chequeo_id": i, "codigo": c.codigo, "resultado": c.resultado, "severidad": c.severidad,
-              "explicacion": c.explicacion} for i, c in zip(ids, chequeos) if c.resultado in ("aviso", "fallo")),
+              "explicacion": c.explicacion} for i, c in zip(ids, chequeos) if c.resultado in ("aviso", "fallo", "no_evaluable")),
             key=lambda m: (m["resultado"] != "fallo", -m["severidad"]),
         )
         conn.execute(
             "INSERT INTO scoring.score (tasacion_id, version, sub_valor, sub_calidad, sub_fraude, compuesto, veredicto, motivos) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-            (tasacion_id, VERSION, sub["valor"], sub["calidad"], sub["fraude"], compuesto, veredicto, json.dumps(motivos)),
+            (tasacion_id, VERSION, sub["valor"], sub["calidad"], sub["fraude"], compuesto, resultado, json.dumps(motivos)),
         )
         conn.execute("UPDATE tasacion.tasacion SET estado = 'puntuada' WHERE id = %s", (tasacion_id,))
-    return {"tasacion_id": tasacion_id, "veredicto": veredicto, "sub_scores": sub, "compuesto": round(compuesto, 3),
+    return {"tasacion_id": tasacion_id, "veredicto": resultado, "sub_scores": sub, "compuesto": round(compuesto, 3),
             "chequeos": [(c.codigo, c.resultado, c.explicacion) for c in chequeos]}
