@@ -9,6 +9,8 @@ docker compose up -d   # PostGIS en localhost:5433 con el esquema aplicado
 uv sync
 ```
 
+Qué fuentes usamos para validar una tasación, qué comprueba cada una y qué falta: [fuentes de validación](docs/fuentes-validacion.md).
+
 Vías de obtención de datos y su estado: [`docs/obtencion-datos.md`](docs/obtencion-datos.md). Catálogo de fuentes: [`docs/fuentes.md`](docs/fuentes.md).
 
 Revisión de fuentes, integración real y pendientes (26-10-2026): [`docs/revision-fuentes.md`](docs/revision-fuentes.md).

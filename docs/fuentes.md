@@ -1,5 +1,7 @@
 # Catálogo de fuentes externas para validar tasaciones (ECO/805/2003)
 
+Para una explicación breve de qué comprueba cada fuente y cuáles están integradas, ver [fuentes de validación](fuentes-validacion.md).
+
 Catálogo histórico del **2026-10-24**: los estados ✅ y las mediciones de este documento corresponden a esa revisión. La [revisión del 26-10-2026](revision-fuentes.md) vuelve a comprobar 14 URLs seleccionadas, distingue descarga de integración y registra las limitaciones encontradas. No se han vuelto a comprobar todas las URLs ni licencias de este catálogo. Lo marcado como **NO VERIFICADO** debe confirmarse antes de construir un descargador sobre ello.
 
 Los documentos oficiales para ensayar la extracción están en [muestras-parser.md](muestras-parser.md), con manifiesto de procedencia y comandos reproducibles.
